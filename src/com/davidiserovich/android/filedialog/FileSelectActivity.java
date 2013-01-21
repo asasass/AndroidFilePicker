@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -13,14 +14,22 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+/**
+ * An activity to select a single file.
+ * 
+ * @param TARGET_PATH a String extra argument from the calling Intent with 
+ * <code>intent.putExtra(FileSelectActivity.TARGET_PATH, "/sdcard/initial/path/here/")</code>
+ * 
+ * @return Returns Intent to onActivityResult with String extra containing the path to the user selected file 
+ * <code>intent.getStringExtra(FileSelectActivity.SELECTED_PATH)</code>
+ *
+ */
 public class FileSelectActivity extends Activity {
-	
-	/** The current list of files */
-	File[] items;
 	
 	/** A string constant for the bundle extra indicating where to start the file selection browser */
 	public static final String TARGET_PATH = "com.davidiserovich.FileSelectActivity.TARGET_PATH";
@@ -28,21 +37,29 @@ public class FileSelectActivity extends Activity {
 	/** Constant key for the bundle extra indicating the file that the user picked */
 	public static final String SELECTED_PATH = "com.davidiserovich.FileSelectActivity.SELECTED_PATH";
 	
+	/** The ListView displaying the current directory */
 	ListView fileList;
 	
+	/** The adapter providing the list items for the fileList */
 	ArrayAdapter<File> fileListAdapter;
 	
-	String selectedFilePath;
-	File previousDirectory;
-	File currentDirectory;
-
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_file_selection);
-		Log.d("what is this", findViewById(R.id.files_list).toString());
-		fileList = (ListView)findViewById(R.id.files_list);
-		
+	/** The path of the file the user selects */
+	private String selectedFilePath;
+	
+	/** The currently displayed directory */
+	private File currentDirectory;
+	
+	/** The list of files in the current directory */
+	private File[] items;
+	
+	// Cached icons 
+	protected Drawable folderIcon;
+	protected Drawable fileIcon;
+	
+	/**
+	 * Initialize the file list using data set in the calling intents, or defaulting to /
+	 */
+	private void initializeFilelist(){
 		Intent launchingIntent = getIntent();
 		String startPath = launchingIntent.getStringExtra(TARGET_PATH);
 		File startFile;
@@ -57,10 +74,12 @@ public class FileSelectActivity extends Activity {
 		
 		currentDirectory = startFile;
 		
+		// Initialize the list
 		populateList();
 		
 		
-		/** Set the listener to return the file's full path as the activity result if it's a file
+		/* 
+		 * Set the listener to return the file's full path as the activity result if it's a file
 		 *  or navigate deeper if it's a directory
 		 */
 		fileList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -84,14 +103,37 @@ public class FileSelectActivity extends Activity {
 			        
 			        else {
 			        	selectedFilePath = f.getAbsolutePath();
+			        	Intent resultData = new Intent();
+						resultData.putExtra(SELECTED_PATH, selectedFilePath);
+						setResult(RESULT_OK, resultData);
 			        	finish();
 			        }
 		    	}
 		    }
 		});
-			
+	}
+
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_file_selection);
+		Log.d("what is this", findViewById(R.id.files_list).toString());
+		fileList = (ListView)findViewById(R.id.files_list);
 		
-		
+		// Cache the icons
+		folderIcon = getResources().getDrawable(R.drawable.collections_collection);
+		fileIcon = getResources().getDrawable(R.drawable.collections_view_as_list);
+				
+		initializeFilelist();					
+	}
+	
+	/**
+	 * Handle press of cancel button, returning failed.
+	 * @param v the button
+	 */
+	public void onClickCancel(View v){
+		// onPause sets failure code for single-file selection
+		finish();
 	}
 	
 	/** 
@@ -111,11 +153,19 @@ public class FileSelectActivity extends Activity {
 			        }
 			        if (v != null) {
 			                TextView titleView = (TextView) v.findViewById(R.id.filename);
-			                if (position == 0)
+			                ImageView icon = (ImageView) v.findViewById(R.id.icon_image);
+			                if (position == 0){
 			                	titleView.setText("..");
-			                
-			                else
-			                	titleView.setText(items[position-1].getName());                  
+			                	icon.setImageDrawable(folderIcon);
+			                }
+			                else{
+			                	titleView.setText(items[position-1].getName());
+			                	if (items[position-1].isDirectory())
+			                		icon.setImageDrawable(folderIcon);
+			                	else
+			                		icon.setImageDrawable(fileIcon);
+			                	
+			                }
 			        }else{
 			        	Log.d("Something", "Is Wrong");
 			        }
@@ -132,19 +182,29 @@ public class FileSelectActivity extends Activity {
 		}
 	}
 	
-	@Override
-	public void onPause(){
-		super.onPause();
-		if (selectedFilePath == null){
-			setResult(RESULT_CANCELED);
+	/** 
+	 * Browse up one directory 
+	 * 
+	 * @return true if success, false if fail
+	 */
+	
+	private boolean navigateUp(){
+		if (currentDirectory.getParent() != null){
+			currentDirectory = currentDirectory.getParentFile();
+			populateList();
+			return true;
 		}
-		else {
-			Intent resultData = new Intent();
-			resultData.putExtra(SELECTED_PATH, selectedFilePath);
-			setResult(RESULT_OK, resultData);
-		}
-
+		return false;
 	}
+	
+	@Override
+	public void onBackPressed() {
+		// Go up one directory, or exit out if we're at the root directory
+		if (!navigateUp()){
+			super.onBackPressed();
+		}
+	}
+
 	
 	
 

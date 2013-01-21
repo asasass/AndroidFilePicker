@@ -2,10 +2,13 @@ package com.davidiserovich.android.filedialog;
 
 import java.io.File;
 
-import android.app.Activity;
-import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -13,13 +16,23 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+/**
+ * An activity to select a single file.
+ * 
+ * @param TARGET_PATH a String extra argument from the calling Intent with 
+ * <code>intent.putExtra(FileSelectActivity.TARGET_PATH, "/sdcard/initial/path/here/")</code>
+ * 
+ * @return Returns Intent to onActivityResult with String extra containing the path to the user selected file 
+ * <code>intent.getStringExtra(FileSelectActivity.SELECTED_PATH)</code>
+ *
+ */
 public class FolderSelectActivity extends Activity {
-	/** The current list of files */
-	File[] items;
 	
 	/** A string constant for the bundle extra indicating where to start the file selection browser */
 	public static final String TARGET_PATH = "com.davidiserovich.FileSelectActivity.TARGET_PATH";
@@ -27,32 +40,49 @@ public class FolderSelectActivity extends Activity {
 	/** Constant key for the bundle extra indicating the file that the user picked */
 	public static final String SELECTED_PATH = "com.davidiserovich.FileSelectActivity.SELECTED_PATH";
 	
+	/** The ListView displaying the current directory */
 	ListView fileList;
 	
+	/** The adapter providing the list items for the fileList */
 	ArrayAdapter<File> fileListAdapter;
 	
-	String selectedFilePath;
-	File previousDirectory;
-	File currentDirectory;
-
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_file_selection);
-		fileList = (ListView)findViewById(R.id.files_list);
-		
+	/** The path of the file the user selects */
+	private String selectedFilePath;
+	
+	/** The currently displayed directory */
+	private File currentDirectory;
+	
+	/** The list of files in the current directory */
+	private File[] items;
+	
+	// Cached icons 
+	protected Drawable folderIcon;
+	protected Drawable fileIcon;
+	
+	/**
+	 * Initialize the file list using data set in the calling intents, or defaulting to /
+	 */
+	private void initializeFilelist(){
 		Intent launchingIntent = getIntent();
 		String startPath = launchingIntent.getStringExtra(TARGET_PATH);
-		File startFile = new File(startPath);
-		if (!startFile.isDirectory()){
+		File startFile;
+
+		if (startPath != null && (startFile = new File(startPath)).isDirectory()){
+			// yay
+		}
+		else {
 			Toast.makeText(this, startPath + " is not a valid directory!", Toast.LENGTH_SHORT).show();		
 			startFile = new File("/");
 		}
 		
 		currentDirectory = startFile;
 		
+		// Initialize the list
+		populateList();
 		
-		/** Set the listener to return the file's full path as the activity result if it's a file
+		
+		/* 
+		 * Set the listener to return the file's full path as the activity result if it's a file
 		 *  or navigate deeper if it's a directory
 		 */
 		fileList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -73,18 +103,120 @@ public class FolderSelectActivity extends Activity {
 			        	currentDirectory = f;
 			        	populateList();
 			        }
-			        
+			        /* Folder selection shouldn't return a file
 			        else {
 			        	selectedFilePath = f.getAbsolutePath();
+			        	Intent resultData = new Intent();
+						resultData.putExtra(SELECTED_PATH, selectedFilePath);
+						setResult(RESULT_OK, resultData);
 			        	finish();
 			        }
+			        */
 		    	}
 		    }
 		});
-			
-		
-		
 	}
+
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_file_selection);
+		Log.d("what is this", findViewById(R.id.files_list).toString());
+		fileList = (ListView)findViewById(R.id.files_list);
+		
+		// Cache the icons
+		folderIcon = getResources().getDrawable(R.drawable.collections_collection);
+		fileIcon = getResources().getDrawable(R.drawable.collections_view_as_list);
+				
+		initializeFilelist();					
+	}
+	
+	/**
+	 * Handle press of cancel button, returning failed.
+	 * @param v the button
+	 */
+	public void onClickCancel(View v){
+		// onPause sets failure code for single-file selection
+		finish();
+	}
+	
+	/**
+	 * Handle press of folder select button, returning the currently active directory
+	 * @param v the button
+	 */
+	public void onClickSelectFolder(View v){
+		selectedFilePath = currentDirectory.getAbsolutePath();
+    	Intent resultData = new Intent();
+		resultData.putExtra(SELECTED_PATH, selectedFilePath);
+		setResult(RESULT_OK, resultData);
+    	finish();
+	}
+	
+	/**
+	 * Handle press of folder creation button, creating a folder in the current directory
+	 * @param v the button
+	 */
+	public void onClickCreateFolder(View v){
+		showFolderNamePrompt();
+	}
+	
+	/**
+	 * Utility function to create a folder in the current directory
+	 * @param folderName
+	 */
+	private void createFolder(String folderName){
+		File folder = new File(currentDirectory.getAbsolutePath() + folderName);
+		folder.mkdir();
+		
+		//Refresh the view
+		populateList();
+	}
+	
+	/**
+	 * Show the prompt for folder creation
+	 */
+	private void showFolderNamePrompt(){
+    	
+    	// get prompts.xml view
+    	LayoutInflater li = LayoutInflater.from(this);
+		View promptsView = li.inflate(R.layout.folder_name_prompt, null);
+
+		AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
+
+		// set prompts.xml to alertdialog builder
+		alertDialogBuilder.setView(promptsView);
+		
+		alertDialogBuilder.setTitle(R.string.folder_name);
+
+		final EditText userInput = (EditText) promptsView
+				.findViewById(R.id.inputText);
+
+		// set dialog message
+		alertDialogBuilder
+			.setCancelable(false)
+			.setPositiveButton("OK",
+			  new DialogInterface.OnClickListener() {
+			    @Override
+				public void onClick(DialogInterface dialog,int id) {
+			    	String folderName = userInput.getText().toString();
+			    	createFolder(folderName);
+			    }
+			  })
+			.setNegativeButton("Cancel",
+			  new DialogInterface.OnClickListener() {
+			    @Override
+				public void onClick(DialogInterface dialog,int id) {
+					dialog.cancel();
+			    }
+			  });
+
+		// create alert dialog
+		AlertDialog alertDialog = alertDialogBuilder.create();
+
+		// show it
+		alertDialog.show();
+    
+    }
 	
 	/** 
 	 * Set the array adapter for the file list 
@@ -92,44 +224,69 @@ public class FolderSelectActivity extends Activity {
 	private void populateList(){
 		// Fill up the items list
 		items = currentDirectory.listFiles();
-		
-		fileListAdapter = new ArrayAdapter<File>(this, R.id.files_list, items){
-			@Override
-		    public View getView(int position, View convertView, ViewGroup parent) {
-		    	View v = convertView;
-		    	if (v == null) {
-		            LayoutInflater vi = (LayoutInflater)getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-		            v = vi.inflate(R.layout.file_list_item, null);
-		        }
-		        if (v != null) {
-		                TextView titleView = (TextView) v.findViewById(R.id.filename);
-		                if (position == 0){
-		                	titleView.setText("..");
-		                }
-		                titleView.setText(items[position-1].getName());                  
-		        }else{
-		        	Log.d("Something", "Is Wrong");
-		        }
-		        return v;
-		    	
-		    }
+		if (items != null){ 
+			fileListAdapter = new ArrayAdapter<File>(this, R.id.files_list, items){
+				@Override
+			    public View getView(int position, View convertView, ViewGroup parent) {
+			    	View v = convertView;
+			    	if (v == null) {
+			            LayoutInflater vi = (LayoutInflater)getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+			            v = vi.inflate(R.layout.file_list_item, null);
+			        }
+			        if (v != null) {
+			                TextView titleView = (TextView) v.findViewById(R.id.filename);
+			                ImageView icon = (ImageView) v.findViewById(R.id.icon_image);
+			                if (position == 0){
+			                	titleView.setText("..");
+			                	icon.setImageDrawable(folderIcon);
+			                }
+			                else{
+			                	titleView.setText(items[position-1].getName());
+			                	if (items[position-1].isDirectory())
+			                		icon.setImageDrawable(folderIcon);
+			                	else
+			                		icon.setImageDrawable(fileIcon);
+			                	
+			                }
+			        }else{
+			        	Log.d("Something", "Is Wrong");
+			        }
+			        return v;
+			    	
+			    }
+				
+			};
 			
-		};
-		
-		fileList.setAdapter(fileListAdapter);
+			fileList.setAdapter(fileListAdapter);
+		}
+		else {
+			Toast.makeText(this, "Directory " + currentDirectory.toString() + " inaccessible.", Toast.LENGTH_SHORT).show();
+		}
+	}
+	
+	/** 
+	 * Browse up one directory 
+	 * 
+	 * @return true if success, false if fail
+	 */
+	
+	private boolean navigateUp(){
+		if (currentDirectory.getParent() != null){
+			currentDirectory = currentDirectory.getParentFile();
+			populateList();
+			return true;
+		}
+		return false;
 	}
 	
 	@Override
-	public void onPause(){
-		if (selectedFilePath == null){
-			setResult(RESULT_CANCELED);
-		}
-		else {
-			Intent resultData = new Intent();
-			resultData.putExtra(SELECTED_PATH, selectedFilePath);
-			setResult(RESULT_OK, resultData);
+	public void onBackPressed() {
+		// Go up one directory, or exit out if we're at the root directory
+		if (!navigateUp()){
+			super.onBackPressed();
 		}
 	}
+
 	
 	
 
@@ -139,4 +296,5 @@ public class FolderSelectActivity extends Activity {
 		getMenuInflater().inflate(R.menu.activity_file_selection, menu);
 		return true;
 	}
+
 }
