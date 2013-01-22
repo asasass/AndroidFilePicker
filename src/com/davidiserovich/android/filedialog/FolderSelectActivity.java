@@ -120,7 +120,7 @@ public class FolderSelectActivity extends Activity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		setContentView(R.layout.activity_file_selection);
+		setContentView(R.layout.activity_folder_selection);
 		Log.d("what is this", findViewById(R.id.files_list).toString());
 		fileList = (ListView)findViewById(R.id.files_list);
 		
@@ -165,8 +165,20 @@ public class FolderSelectActivity extends Activity {
 	 * @param folderName
 	 */
 	private void createFolder(String folderName){
-		File folder = new File(currentDirectory.getAbsolutePath() + folderName);
-		folder.mkdir();
+		//TODO: Allow UNICODE directories - not just alphanumeric
+		//Check with regex that input is alphanumeric
+		if (!folderName.matches("^[a-zA-Z0-9]*$")){
+			Toast.makeText(this, getString(R.string.invalid_folder_name), Toast.LENGTH_SHORT);
+		}
+		
+		File folder = new File(currentDirectory.getAbsolutePath() + "/" + folderName);
+		
+		//TODO: DEBUG CODE
+		Toast.makeText(this, folder.toString(), Toast.LENGTH_SHORT).show();
+
+		//Attempt to create the subdirectory
+		if (!folder.mkdir())
+			Toast.makeText(this, getString(R.string.folder_creation_failed), Toast.LENGTH_SHORT).show();
 		
 		//Refresh the view
 		populateList();
