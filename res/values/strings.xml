@@ -14,5 +14,6 @@
     <string name="folder_name">Folder Name</string>
     <string name="folder_creation_failed">Cannot create a subdirectory in the current directory</string>
     <string name="invalid_folder_name">Invalid directory name. Please use an alphanumeric name.</string>
+    <string name="create_folder">Create a new folder</string>
 
 </resources>

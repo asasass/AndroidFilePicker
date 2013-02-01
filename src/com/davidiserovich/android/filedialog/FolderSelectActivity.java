@@ -198,7 +198,7 @@ public class FolderSelectActivity extends Activity {
 		// set prompts.xml to alertdialog builder
 		alertDialogBuilder.setView(promptsView);
 		
-		alertDialogBuilder.setTitle(R.string.folder_name);
+		alertDialogBuilder.setTitle(R.string.create_folder);
 
 		final EditText userInput = (EditText) promptsView
 				.findViewById(R.id.inputText);
