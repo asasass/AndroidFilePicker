@@ -1,6 +1,8 @@
 package com.davidiserovich.android.filedialog;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Comparator;
 
 import android.os.Bundle;
 import android.app.Activity;
@@ -64,10 +66,8 @@ public class FileSelectActivity extends Activity {
 		String startPath = launchingIntent.getStringExtra(TARGET_PATH);
 		File startFile;
 
-		if (startPath != null && (startFile = new File(startPath)).isDirectory()){
-			// yay
-		}
-		else {
+		// Check that the start path makes sense
+		if (startPath == null || !(startFile = new File(startPath)).isDirectory()){
 			Toast.makeText(this, startPath + " is not a valid directory!", Toast.LENGTH_SHORT).show();		
 			startFile = new File("/");
 		}
@@ -142,6 +142,19 @@ public class FileSelectActivity extends Activity {
 	private void populateList(){
 		// Fill up the items list
 		items = currentDirectory.listFiles();
+		
+		// Sort alphabetically, showing directories first
+		Arrays.sort(items, new Comparator<File>(){
+		    public int compare(File f1, File f2)
+		    {
+		    	if ( f1.isDirectory() && !f2.isDirectory() ) return -1;
+		    	if ( f2.isDirectory() && !f1.isDirectory() ) return 1;
+		    	
+		    	
+		        return f1.getName().compareTo(f2.getName());
+		    } 	    
+		});
+		
 		if (items != null){ 
 			fileListAdapter = new ArrayAdapter<File>(this, R.id.files_list, items){
 				@Override
